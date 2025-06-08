@@ -6,8 +6,14 @@
     
     <title>Roteiro Europa em Família</title>
     <meta name="description" content="Mapa interativo da viagem para a Europa em família: 14 destinos, 4 países e mais de 18.000 km de memórias.">
+    <!-- Meta Tags para Redes Sociais -->
     <meta property="og:title" content="Roteiro Europa em Família (Lis, Zeu, Helena, Luisa)">
     <meta property="og:description" content="Explore o mapa interativo da nossa viagem inesquecível pela Europa.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    
+    <!-- Favicon (SVG) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗺️</text></svg>">
     
     <!-- Preload & Optimized Fonts/CSS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,7 +30,6 @@
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc; /* bg-slate-50 */
         }
-        /* Layout principal */
         #main-content {
             display: grid;
             grid-template-areas: "header" "content";
@@ -35,40 +40,34 @@
         header { grid-area: header; }
         #app-container { grid-area: content; }
 
-        #map {
-            height: 100%;
-            width: 100%;
-            border-radius: 0.75rem;
-            z-index: 1;
-        }
+        #map-container { position: relative; width: 100%; height: 100%; }
+        #map { height: 100%; width: 100%; border-radius: 0.75rem; z-index: 1; background-color: #e2e8f0; }
         
-        /* Marcadores do Mapa */
-        .marker-icon {
+        /* Loading Spinner */
+        #map-spinner {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px; height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #6366f1;
             border-radius: 50%;
-            width: 16px !important;
-            height: 16px !important;
-            border: 3px solid #fff;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.25);
-            cursor: pointer;
-            transition: transform 0.2s ease-in-out;
+            animation: spin 1s linear infinite;
+            z-index: 2;
         }
+        @keyframes spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        /* Marcadores do Mapa */
+        .marker-icon { border-radius: 50%; width: 16px !important; height: 16px !important; border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.2s ease-in-out; }
         .marker-icon.active { transform: scale(1.5); z-index: 1000 !important; }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
         .marker-icon.active { animation: pulse 1.5s infinite; }
 
         .start-icon { background-color: #10b981; } /* Verde */
         .end-icon { background-color: #ef4444; } /* Vermelho */
         .intermediate-icon { background-color: #3b82f6; } /* Azul */
         
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-            background-color: #ffffff;
-            color: #1e293b;
-            border-radius: 0.5rem;
-        }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background-color: #ffffff; color: #1e293b; border-radius: 0.5rem; }
         
         /* Controles */
         #speed-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #e2e8f0; border-radius: 5px; outline: none; }
@@ -78,13 +77,8 @@
         .itinerary-item.active .item-number { background-color: #6366f1; color: #ffffff; }
 
         /* Bottom Sheet para Mobile */
-        #itinerary-panel {
-            transform: translateY(calc(100% - 80px)); /* Começa "escondido" */
-            transition: transform 0.4s ease-in-out;
-        }
-        #itinerary-panel.open {
-            transform: translateY(0);
-        }
+        #itinerary-panel { transform: translateY(calc(100% - 80px)); transition: transform 0.4s ease-in-out; }
+        #itinerary-panel.open { transform: translateY(0); }
     </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -104,10 +98,11 @@
     </header>
 
     <div id="app-container" class="relative overflow-hidden">
-        <!-- Mapa ocupa todo o espaço disponível -->
-        <div id="map" class="absolute inset-0"></div>
+        <div id="map-container" class="absolute inset-0">
+            <div id="map"></div>
+            <div id="map-spinner"></div>
+        </div>
         
-        <!-- Bottom Sheet Panel (Mobile) / Sidebar (Desktop) -->
         <div id="itinerary-panel" class="absolute inset-0 lg:inset-auto lg:top-8 lg:left-8 lg:bottom-8 lg:w-1/3 xl:w-96 bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl border border-slate-100 flex flex-col z-10">
             <div id="panel-handle" class="w-full py-4 flex justify-center items-center cursor-pointer lg:hidden">
                 <div class="w-10 h-1.5 bg-slate-300 rounded-full"></div>
@@ -167,9 +162,8 @@
     <script>
     document.addEventListener('DOMContentLoaded', function () {
             
-            // --- UTILS ---
             function getDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371; // Earth radius in km
+                const R = 6371;
                 const dLat = (lat2 - lat1) * Math.PI / 180;
                 const dLon = (lon2 - lon1) * Math.PI / 180;
                 const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
@@ -177,7 +171,6 @@
                 return R * c;
             }
 
-            // --- DATA ---
             const itineraryData = [
                 { name: 'Florianópolis', country: 'Brasil', coords: [-27.5954, -48.5480], type: 'Saída' },
                 { name: 'Lisboa', country: 'Portugal', coords: [38.7223, -9.1393] },
@@ -195,7 +188,6 @@
                 { name: 'Florianópolis', country: 'Brasil', coords: [-27.5954, -48.5480], type: 'Chegada' },
             ].map((item, index, arr) => ({ ...item, prevDist: index > 0 ? Math.round(getDistance(...arr[index-1].coords, ...item.coords)) : null, nextDist: index < arr.length - 1 ? Math.round(getDistance(...item.coords, ...arr[index+1].coords)) : null }));
             
-            // --- STATE & DOM REFS ---
             const itineraryList = document.getElementById('itinerary-list');
             const speedSlider = document.getElementById('speed-slider');
             const zoomButtons = document.querySelectorAll('.zoom-btn');
@@ -205,7 +197,10 @@
             const flyControls = document.getElementById('fly-controls');
             const itineraryPanel = document.getElementById('itinerary-panel');
             const panelHandle = document.getElementById('panel-handle');
+            const mapContainer = document.getElementById('map-container');
+            const mapSpinner = document.getElementById('map-spinner');
             
+            let map;
             let mapMarkers = [];
             let routeSegments = [];
             let animationDuration = 3; 
@@ -213,46 +208,67 @@
             let isFlyMode = false;
             let currentActiveIndex = 0;
 
-            // --- MAP INITIALIZATION ---
-            const map = L.map('map', { zoomControl: false }).setView([46, 8], 5);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>', maxZoom: 19
-            }).addTo(map);
-            L.control.zoom({ position: 'topright' }).addTo(map);
+            function initializeMap() {
+                if (map) return; // Initialize only once
 
-            const startIcon = L.divIcon({ className: 'marker-icon start-icon' });
-            const endIcon = L.divIcon({ className: 'marker-icon end-icon' });
-            const intermediateIcon = L.divIcon({ className: 'marker-icon intermediate-icon' });
+                mapSpinner.style.display = 'none';
+
+                map = L.map('map', { zoomControl: false }).setView([46, 8], 5);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>', maxZoom: 19
+                }).addTo(map);
+                L.control.zoom({ position: 'topright' }).addTo(map);
+
+                const startIcon = L.divIcon({ className: 'marker-icon start-icon' });
+                const endIcon = L.divIcon({ className: 'marker-icon end-icon' });
+                const intermediateIcon = L.divIcon({ className: 'marker-icon intermediate-icon' });
+                
+                const uniqueLocations = [];
+                itineraryData.forEach(loc => {
+                    if (!uniqueLocations.some(l => l.name === loc.name)) uniqueLocations.push(loc);
+                });
+
+                uniqueLocations.forEach((loc) => {
+                    const marker = L.marker(loc.coords, { 
+                        icon: loc.type === 'Saída' ? startIcon : (loc.type === 'Chegada' ? endIcon : intermediateIcon)
+                    }).addTo(map).bindPopup(`<b>${loc.name}</b>`);
+                    
+                    marker.on('click', () => {
+                        const firstMatchIndex = itineraryData.findIndex(item => item.name === loc.name);
+                        selectItineraryItem(firstMatchIndex);
+                    });
+                    mapMarkers.push({ name: loc.name, marker });
+                });
+
+                const routeLatLngs = itineraryData.map(loc => loc.coords);
+                const mainRoute = L.polyline(routeLatLngs, { 
+                    color: '#60a5fa', weight: 3, opacity: 0.8, dashArray: '5, 10' 
+                }).addTo(map);
+
+                for (let i = 0; i < itineraryData.length - 1; i++) {
+                    routeSegments.push(itineraryData[i].name !== itineraryData[i+1].name ? L.polyline([itineraryData[i].coords, itineraryData[i+1].coords], { color: '#3b82f6', weight: 4, opacity: 0 }).addTo(map) : null);
+                }
+                
+                map.fitBounds(mainRoute.getBounds().pad(0.2));
+                resetViewBtn.addEventListener('click', () => {
+                    map.fitBounds(mainRoute.getBounds().pad(0.2));
+                    allItineraryItems.forEach(item => {
+                        item.classList.remove('active');
+                        item.querySelector('.prev-distance-info').classList.add('hidden');
+                        item.querySelector('.next-distance-info').classList.add('hidden');
+                    });
+                    routeSegments.forEach(segment => { if(segment) segment.setStyle({ opacity: 0 }); });
+                    mapMarkers.forEach(m => m.marker.getElement()?.classList.remove('active'));
+                });
+
+                const lastIndex = parseInt(localStorage.getItem('lastIndex')) || 0;
+                setTimeout(() => { selectItineraryItem(lastIndex); }, 200);
+            }
             
-            // --- RENDER & SETUP ---
             const uniqueLocations = [];
             itineraryData.forEach(loc => {
                 if (!uniqueLocations.some(l => l.name === loc.name)) uniqueLocations.push(loc);
             });
-
-            uniqueLocations.forEach((loc) => {
-                const marker = L.marker(loc.coords, { 
-                    icon: loc.type === 'Saída' ? startIcon : (loc.type === 'Chegada' ? endIcon : intermediateIcon)
-                }).addTo(map).bindPopup(`<b>${loc.name}</b>`);
-                
-                marker.on('click', () => {
-                    const firstMatchIndex = itineraryData.findIndex(item => item.name === loc.name);
-                    selectItineraryItem(firstMatchIndex);
-                });
-                mapMarkers.push({ name: loc.name, marker });
-            });
-
-            const routeLatLngs = itineraryData.map(loc => loc.coords);
-            const mainRoute = L.polyline(routeLatLngs, { 
-                color: '#60a5fa', weight: 3, opacity: 0.8, dashArray: '5, 10' 
-            }).addTo(map);
-
-            for (let i = 0; i < itineraryData.length - 1; i++) {
-                routeSegments.push(itineraryData[i].name !== itineraryData[i+1].name ? L.polyline([itineraryData[i].coords, itineraryData[i+1].coords], { color: '#3b82f6', weight: 4, opacity: 0 }).addTo(map) : null);
-            }
-            
-            map.fitBounds(mainRoute.getBounds().pad(0.2));
-
             itineraryData.forEach((item, index) => {
                 const li = document.createElement('li');
                 li.className = 'itinerary-item cursor-pointer rounded-lg';
@@ -284,11 +300,10 @@
             document.getElementById('countries-value').textContent = new Set(itineraryData.map(l => l.country)).size;
             document.getElementById('km-value').textContent = `~${(Math.round(totalKm / 100) * 100).toLocaleString('pt-BR')} km`;
             
-            // --- FUNCTIONS & EVENT LISTENERS ---
             const allItineraryItems = document.querySelectorAll('.itinerary-item');
             
             function selectItineraryItem(index) {
-                if (index < 0 || index >= allItineraryItems.length) return;
+                if (!map || index < 0 || index >= allItineraryItems.length) return;
                 currentActiveIndex = index;
 
                 allItineraryItems.forEach((otherItem, otherIndex) => {
@@ -354,34 +369,35 @@
                     animationZoom = parseInt(button.dataset.zoom, 10);
                 });
             });
-            resetViewBtn.addEventListener('click', () => {
-                map.fitBounds(mainRoute.getBounds().pad(0.2));
-                allItineraryItems.forEach(item => {
-                    item.classList.remove('active');
-                    item.querySelector('.prev-distance-info').classList.add('hidden');
-                    item.querySelector('.next-distance-info').classList.add('hidden');
-                });
-                routeSegments.forEach(segment => { if(segment) segment.setStyle({ opacity: 0 }); });
-                mapMarkers.forEach(m => m.marker.getElement()?.classList.remove('active'));
-            });
             modeFastBtn.addEventListener('click', () => setViewMode(false));
             modeFlyBtn.addEventListener('click', () => setViewMode(true));
             panelHandle.addEventListener('click', () => itineraryPanel.classList.toggle('open'));
             
-            // Keyboard navigation
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowRight') {
-                    selectItineraryItem(currentActiveIndex + 1);
-                } else if (e.key === 'ArrowLeft') {
-                    selectItineraryItem(currentActiveIndex - 1);
-                }
+                if (e.key === 'ArrowRight') { selectItineraryItem(currentActiveIndex + 1); } 
+                else if (e.key === 'ArrowLeft') { selectItineraryItem(currentActiveIndex - 1); }
             });
 
-            // --- Initial State ---
+            // Swipe Gestures
+            let touchstartX = 0; let touchendX = 0;
+            const appContainer = document.getElementById('app-container');
+            appContainer.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; }, { passive: true });
+            appContainer.addEventListener('touchend', e => {
+                touchendX = e.changedTouches[0].screenX;
+                if (touchendX < touchstartX - 50) { selectItineraryItem(currentActiveIndex + 1); }
+                if (touchendX > touchstartX + 50) { selectItineraryItem(currentActiveIndex - 1); }
+            });
+            
+            // Lazy Load the Map
+            const observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting) {
+                    initializeMap();
+                    observer.disconnect();
+                }
+            }, { threshold: 0.1 });
+            observer.observe(mapContainer);
+            
             lucide.createIcons();
-            const lastIndex = parseInt(localStorage.getItem('lastIndex')) || 0;
-            setTimeout(() => { selectItineraryItem(lastIndex); }, 200);
-
         });
     </script>
 </body>
