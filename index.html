@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Roteiro Europa em Família</title>
+    <meta name="description" content="Mapa interativo da viagem para a Europa em família: 14 destinos, 4 países e mais de 18.000 km de memórias.">
+    <meta property="og:title" content="Roteiro Europa em Família (Lis, Zeu, Helena, Luisa)">
+    <meta property="og:description" content="Explore o mapa interativo da nossa viagem inesquecível pela Europa.">
+    
+    <!-- Preload & Optimized Fonts/CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* bg-slate-50 */
+        }
+        /* Layout principal */
+        #main-content {
+            display: grid;
+            grid-template-areas: "header" "content";
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            overflow: hidden;
+        }
+        header { grid-area: header; }
+        #app-container { grid-area: content; }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 1;
+        }
+        
+        /* Marcadores do Mapa */
+        .marker-icon {
+            border-radius: 50%;
+            width: 16px !important;
+            height: 16px !important;
+            border: 3px solid #fff;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.25);
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+        }
+        .marker-icon.active { transform: scale(1.5); z-index: 1000 !important; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .marker-icon.active { animation: pulse 1.5s infinite; }
+
+        .start-icon { background-color: #10b981; } /* Verde */
+        .end-icon { background-color: #ef4444; } /* Vermelho */
+        .intermediate-icon { background-color: #3b82f6; } /* Azul */
+        
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background-color: #ffffff;
+            color: #1e293b;
+            border-radius: 0.5rem;
+        }
+        
+        /* Controles */
+        #speed-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #e2e8f0; border-radius: 5px; outline: none; }
+        #speed-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; background: #6366f1; cursor: pointer; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px #cbd5e1; }
+        .control-btn.active { background-color: #6366f1 !important; color: #ffffff !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .itinerary-item.active .item-main-info { background-color: #f1f5f9; }
+        .itinerary-item.active .item-number { background-color: #6366f1; color: #ffffff; }
+
+        /* Bottom Sheet para Mobile */
+        #itinerary-panel {
+            transform: translateY(calc(100% - 80px)); /* Começa "escondido" */
+            transition: transform 0.4s ease-in-out;
+        }
+        #itinerary-panel.open {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+
+<div id="main-content">
+    <header class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-4 sm:p-6 shadow-lg z-20">
+        <div class="container mx-auto max-w-7xl flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl sm:text-4xl font-bold tracking-tight">Roteiro Europa em Família</h1>
+                <p class="text-base sm:text-xl text-indigo-200 mt-1">(Lis, Zeu, Helena, Luisa)</p>
+            </div>
+            <button id="reset-view-btn" class="hidden sm:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white font-semibold py-2 px-4 rounded-lg transition-all">
+                <i data-lucide="zoom-out"></i>
+                Ver Rota Completa
+            </button>
+        </div>
+    </header>
+
+    <div id="app-container" class="relative overflow-hidden">
+        <!-- Mapa ocupa todo o espaço disponível -->
+        <div id="map" class="absolute inset-0"></div>
+        
+        <!-- Bottom Sheet Panel (Mobile) / Sidebar (Desktop) -->
+        <div id="itinerary-panel" class="absolute inset-0 lg:inset-auto lg:top-8 lg:left-8 lg:bottom-8 lg:w-1/3 xl:w-96 bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl border border-slate-100 flex flex-col z-10">
+            <div id="panel-handle" class="w-full py-4 flex justify-center items-center cursor-pointer lg:hidden">
+                <div class="w-10 h-1.5 bg-slate-300 rounded-full"></div>
+            </div>
+            <div class="p-6 pt-0 lg:pt-6 flex-1 flex flex-col min-h-0">
+                <h2 class="text-2xl font-bold mb-4 text-slate-700">Destinos da Viagem</h2>
+                <ul id="itinerary-list" class="space-y-1 overflow-y-auto flex-1"></ul>
+                <div class="space-y-4 mt-6 pt-4 border-t border-slate-200">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-2">Modo de Navegação</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="mode-fast" class="control-btn active flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação rápida"><i data-lucide="rabbit"></i> Rápido</button>
+                            <button id="mode-fly" class="control-btn flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação com voo"><i data-lucide="feather"></i> Voo</button>
+                        </div>
+                    </div>
+                    <div id="fly-controls" class="hidden space-y-4 transition-opacity duration-300 opacity-0">
+                        <label class="block text-sm font-medium text-slate-600">Opções de Voo</label>
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="rewind" class="text-slate-500"></i>
+                            <input type="range" id="speed-slider" min="1" max="5" value="3" class="w-full" aria-label="Controle de velocidade">
+                            <i data-lucide="fast-forward" class="text-slate-500"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    
+<div class="fixed bottom-0 left-0 right-0 p-4 z-20 pointer-events-none">
+    <div class="container mx-auto max-w-7xl">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 pointer-events-auto">
+            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+                <div class="bg-blue-100 p-3 rounded-full"><i data-lucide="map-pin" class="text-blue-600"></i></div>
+                <div><p class="text-sm text-slate-500">Paradas</p><p id="stops-value" class="text-xl font-bold text-slate-700">0</p></div>
+            </div>
+            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+                <div class="bg-green-100 p-3 rounded-full"><i data-lucide="globe" class="text-green-600"></i></div>
+                <div><p class="text-sm text-slate-500">Países</p><p id="countries-value" class="text-xl font-bold text-slate-700">0</p></div>
+            </div>
+            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+                <div class="bg-yellow-100 p-3 rounded-full"><i data-lucide="calendar" class="text-yellow-600"></i></div>
+                <div><p class="text-sm text-slate-500">Duração</p><p id="days-value" class="text-xl font-bold text-slate-700">~18 Dias</p></div>
+            </div>
+            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+                <div class="bg-red-100 p-3 rounded-full"><i data-lucide="plane" class="text-red-600"></i></div>
+                <div><p class="text-sm text-slate-500">Distância</p><p id="km-value" class="text-xl font-bold text-slate-700">~0 km</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="https://unpkg.com/lucide@0.378.0/dist/umd/lucide.min.js" defer></script>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+            
+            // --- UTILS ---
+            function getDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // Earth radius in km
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return R * c;
+            }
+
+            // --- DATA ---
+            const itineraryData = [
+                { name: 'Florianópolis', country: 'Brasil', coords: [-27.5954, -48.5480], type: 'Saída' },
+                { name: 'Lisboa', country: 'Portugal', coords: [38.7223, -9.1393] },
+                { name: 'Roma', country: 'Itália', coords: [41.9028, 12.4964] },
+                { name: 'Florença', country: 'Itália', coords: [43.7696, 11.2558] },
+                { name: 'Pisa', country: 'Itália', coords: [43.7228, 10.4017] },
+                { name: 'Florença', country: 'Itália', coords: [43.7696, 11.2558], type: 'Passagem' },
+                { name: 'Veneza', country: 'Itália', coords: [45.4408, 12.3155] },
+                { name: 'Milão', country: 'Itália', coords: [45.4642, 9.1900] },
+                { name: 'Varenna', country: 'Itália', coords: [46.0107, 9.2831] },
+                { name: 'Milão', country: 'Itália', coords: [45.4642, 9.1900], type: 'Passagem' },
+                { name: 'Zurique', country: 'Suíça', coords: [47.3769, 8.5417] },
+                { name: 'Paris', country: 'França', coords: [48.8566, 2.3522] },
+                { name: 'São Paulo', country: 'Brasil', coords: [-23.5505, -46.6333], type: 'Conexão' },
+                { name: 'Florianópolis', country: 'Brasil', coords: [-27.5954, -48.5480], type: 'Chegada' },
+            ].map((item, index, arr) => ({ ...item, prevDist: index > 0 ? Math.round(getDistance(...arr[index-1].coords, ...item.coords)) : null, nextDist: index < arr.length - 1 ? Math.round(getDistance(...item.coords, ...arr[index+1].coords)) : null }));
+            
+            // --- STATE & DOM REFS ---
+            const itineraryList = document.getElementById('itinerary-list');
+            const speedSlider = document.getElementById('speed-slider');
+            const zoomButtons = document.querySelectorAll('.zoom-btn');
+            const resetViewBtn = document.getElementById('reset-view-btn');
+            const modeFastBtn = document.getElementById('mode-fast');
+            const modeFlyBtn = document.getElementById('mode-fly');
+            const flyControls = document.getElementById('fly-controls');
+            const itineraryPanel = document.getElementById('itinerary-panel');
+            const panelHandle = document.getElementById('panel-handle');
+            
+            let mapMarkers = [];
+            let routeSegments = [];
+            let animationDuration = 3; 
+            let animationZoom = 9;
+            let isFlyMode = false;
+            let currentActiveIndex = 0;
+
+            // --- MAP INITIALIZATION ---
+            const map = L.map('map', { zoomControl: false }).setView([46, 8], 5);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>', maxZoom: 19
+            }).addTo(map);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            const startIcon = L.divIcon({ className: 'marker-icon start-icon' });
+            const endIcon = L.divIcon({ className: 'marker-icon end-icon' });
+            const intermediateIcon = L.divIcon({ className: 'marker-icon intermediate-icon' });
+            
+            // --- RENDER & SETUP ---
+            const uniqueLocations = [];
+            itineraryData.forEach(loc => {
+                if (!uniqueLocations.some(l => l.name === loc.name)) uniqueLocations.push(loc);
+            });
+
+            uniqueLocations.forEach((loc) => {
+                const marker = L.marker(loc.coords, { 
+                    icon: loc.type === 'Saída' ? startIcon : (loc.type === 'Chegada' ? endIcon : intermediateIcon)
+                }).addTo(map).bindPopup(`<b>${loc.name}</b>`);
+                
+                marker.on('click', () => {
+                    const firstMatchIndex = itineraryData.findIndex(item => item.name === loc.name);
+                    selectItineraryItem(firstMatchIndex);
+                });
+                mapMarkers.push({ name: loc.name, marker });
+            });
+
+            const routeLatLngs = itineraryData.map(loc => loc.coords);
+            const mainRoute = L.polyline(routeLatLngs, { 
+                color: '#60a5fa', weight: 3, opacity: 0.8, dashArray: '5, 10' 
+            }).addTo(map);
+
+            for (let i = 0; i < itineraryData.length - 1; i++) {
+                routeSegments.push(itineraryData[i].name !== itineraryData[i+1].name ? L.polyline([itineraryData[i].coords, itineraryData[i+1].coords], { color: '#3b82f6', weight: 4, opacity: 0 }).addTo(map) : null);
+            }
+            
+            map.fitBounds(mainRoute.getBounds().pad(0.2));
+
+            itineraryData.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'itinerary-item cursor-pointer rounded-lg';
+                li.dataset.index = index;
+                const prevDistanceInfo = document.createElement('div');
+                prevDistanceInfo.className = 'prev-distance-info pl-11 pb-1 text-xs text-slate-500 hidden';
+                li.appendChild(prevDistanceInfo);
+                const mainInfo = document.createElement('div');
+                mainInfo.className = 'item-main-info flex items-center gap-4 p-3 rounded-lg transition-all duration-200';
+                const numberCircle = document.createElement('span');
+                numberCircle.className = 'item-number flex-shrink-0 w-7 h-7 flex items-center justify-center bg-slate-100 text-slate-500 text-sm font-semibold rounded-lg transition-all';
+                numberCircle.textContent = index + 1;
+                let locationName = item.name;
+                if(item.type && !['Saída', 'Chegada'].includes(item.type)) locationName += ` (${item.type})`;
+                const textSpan = document.createElement('span');
+                textSpan.className = 'text-slate-600 font-medium';
+                textSpan.textContent = locationName;
+                mainInfo.appendChild(numberCircle);
+                mainInfo.appendChild(textSpan);
+                li.appendChild(mainInfo);
+                const nextDistanceInfo = document.createElement('div');
+                nextDistanceInfo.className = 'next-distance-info pl-11 pt-1 text-xs text-slate-500 hidden';
+                li.appendChild(nextDistanceInfo);
+                itineraryList.appendChild(li);
+            });
+            
+            let totalKm = itineraryData.reduce((acc, item) => acc + (item.nextDist || 0), 0);
+            document.getElementById('stops-value').textContent = uniqueLocations.length;
+            document.getElementById('countries-value').textContent = new Set(itineraryData.map(l => l.country)).size;
+            document.getElementById('km-value').textContent = `~${(Math.round(totalKm / 100) * 100).toLocaleString('pt-BR')} km`;
+            
+            // --- FUNCTIONS & EVENT LISTENERS ---
+            const allItineraryItems = document.querySelectorAll('.itinerary-item');
+            
+            function selectItineraryItem(index) {
+                if (index < 0 || index >= allItineraryItems.length) return;
+                currentActiveIndex = index;
+
+                allItineraryItems.forEach((otherItem, otherIndex) => {
+                    otherItem.classList.toggle('active', otherIndex === index);
+                    otherItem.querySelector('.prev-distance-info').classList.add('hidden');
+                    otherItem.querySelector('.next-distance-info').classList.add('hidden');
+                });
+                mapMarkers.forEach(m => m.marker.getElement()?.classList.remove('active'));
+
+                const item = allItineraryItems[index];
+                item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                const prevDistDiv = item.querySelector('.prev-distance-info');
+                const nextDistDiv = item.querySelector('.next-distance-info');
+            
+                const currentPoint = itineraryData[index];
+                const prevPoint = index > 0 ? itineraryData[index - 1] : null;
+            
+                const targetMarker = mapMarkers.find(m => m.name === currentPoint.name);
+                if (targetMarker) {
+                    isFlyMode ? map.flyTo(currentPoint.coords, animationZoom, { animate: true, duration: animationDuration }) : map.setView(currentPoint.coords, animationZoom);
+                    targetMarker.marker.openPopup();
+                    targetMarker.marker.getElement()?.classList.add('active');
+                }
+            
+                if (currentPoint.prevDist && prevPoint?.name !== currentPoint.name) {
+                    prevDistDiv.innerHTML = `<span class="flex items-center gap-2"><i data-lucide="arrow-left" class="w-3 h-3 text-slate-400"></i> ${currentPoint.prevDist.toLocaleString('pt-BR')} km de ${prevPoint.name}</span>`;
+                    prevDistDiv.classList.remove('hidden');
+                }
+                if (currentPoint.nextDist && itineraryData[index+1]?.name !== currentPoint.name) {
+                    nextDistDiv.innerHTML = `<span class="flex items-center gap-2"><i data-lucide="arrow-right" class="w-3 h-3 text-slate-400"></i> ${currentPoint.nextDist.toLocaleString('pt-BR')} km para ${itineraryData[index+1].name}</span>`;
+                    nextDistDiv.classList.remove('hidden');
+                }
+            
+                lucide.createIcons();
+            
+                routeSegments.forEach((segment, i) => {
+                    if (segment) segment.setStyle({ opacity: (i === index || i === index - 1) ? 1 : 0 }).bringToFront();
+                });
+                
+                localStorage.setItem('lastIndex', index);
+            }
+            
+            function setViewMode(isFly) {
+                 isFlyMode = isFly;
+                 modeFlyBtn.classList.toggle('active', isFly);
+                 modeFastBtn.classList.toggle('active', !isFly);
+                 if (isFly) {
+                     flyControls.classList.remove('hidden');
+                     setTimeout(() => flyControls.classList.add('opacity-100'), 10);
+                 } else {
+                     flyControls.classList.remove('opacity-100');
+                     setTimeout(() => flyControls.classList.add('hidden'), 300);
+                 }
+            }
+
+            allItineraryItems.forEach((item, index) => item.addEventListener('click', () => selectItineraryItem(index)));
+            speedSlider.addEventListener('input', (e) => { animationDuration = 6 - e.target.value; });
+            zoomButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    document.querySelectorAll('.zoom-btn').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    animationZoom = parseInt(button.dataset.zoom, 10);
+                });
+            });
+            resetViewBtn.addEventListener('click', () => {
+                map.fitBounds(mainRoute.getBounds().pad(0.2));
+                allItineraryItems.forEach(item => {
+                    item.classList.remove('active');
+                    item.querySelector('.prev-distance-info').classList.add('hidden');
+                    item.querySelector('.next-distance-info').classList.add('hidden');
+                });
+                routeSegments.forEach(segment => { if(segment) segment.setStyle({ opacity: 0 }); });
+                mapMarkers.forEach(m => m.marker.getElement()?.classList.remove('active'));
+            });
+            modeFastBtn.addEventListener('click', () => setViewMode(false));
+            modeFlyBtn.addEventListener('click', () => setViewMode(true));
+            panelHandle.addEventListener('click', () => itineraryPanel.classList.toggle('open'));
+            
+            // Keyboard navigation
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight') {
+                    selectItineraryItem(currentActiveIndex + 1);
+                } else if (e.key === 'ArrowLeft') {
+                    selectItineraryItem(currentActiveIndex - 1);
+                }
+            });
+
+            // --- Initial State ---
+            lucide.createIcons();
+            const lastIndex = parseInt(localStorage.getItem('lastIndex')) || 0;
+            setTimeout(() => { selectItineraryItem(lastIndex); }, 200);
+
+        });
+    </script>
+</body>
+</html>
