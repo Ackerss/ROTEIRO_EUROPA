@@ -26,28 +26,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        html, body {
-            overflow: hidden;
-            height: 100%;
-        }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc; /* bg-slate-50 */
         }
-        #main-container {
-            display: grid;
-            grid-template-rows: auto 1fr;
-            height: 100vh;
-        }
-        #app-container {
-            position: relative;
-            overflow: hidden;
-        }
-
         #map {
-            height: 100%;
+            height: 550px; /* Altura fixa para consistência */
             width: 100%;
+            border-radius: 0.75rem; /* rounded-xl */
             z-index: 1;
+            background-color: #e2e8f0;
         }
         
         /* Marcadores do Mapa */
@@ -68,43 +56,11 @@
         .control-btn.active { background-color: #6366f1 !important; color: #ffffff !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
         .itinerary-item.active .item-main-info { background-color: #f1f5f9; }
         .itinerary-item.active .item-number { background-color: #6366f1; color: #ffffff; }
-
-        /* Bottom Sheet (Mobile) / Sidebar (Desktop) */
-        #itinerary-panel {
-            position: absolute;
-            z-index: 10;
-            background-color: white;
-            transition: transform 0.4s ease-in-out;
-            display: flex;
-            flex-direction: column;
-        }
-
-        @media (max-width: 1023px) { /* Estilos Mobile */
-            #itinerary-panel {
-                inset: 0;
-                transform: translateY(calc(100% - 80px)); /* Começa "escondido" */
-                border-radius: 1rem 1rem 0 0;
-                box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
-            }
-            #itinerary-panel.open {
-                transform: translateY(25%); /* Posição aberta */
-            }
-        }
-        @media (min-width: 1024px) { /* Estilos Desktop */
-            #itinerary-panel {
-                top: 1.5rem; left: 1.5rem; bottom: 1.5rem;
-                width: 384px; /* w-96 */
-                border-radius: 1rem;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            }
-        }
-
     </style>
 </head>
 <body class="text-slate-800 antialiased">
 
-<div id="main-container">
-    <header class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-4 sm:p-6 shadow-lg z-20">
+    <header class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-4 sm:p-6 shadow-lg sticky top-0 z-20">
         <div class="container mx-auto max-w-7xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl sm:text-4xl font-bold tracking-tight">Roteiro Europa em Família</h1>
@@ -117,60 +73,59 @@
         </div>
     </header>
 
-    <div id="app-container">
-        <div id="map"></div>
-        
-        <div id="itinerary-panel">
-            <div id="panel-handle" class="w-full py-4 flex justify-center items-center cursor-pointer lg:hidden">
-                <div class="w-10 h-1.5 bg-slate-300 rounded-full"></div>
-            </div>
-            <div class="p-6 pt-0 lg:pt-6 flex-1 flex flex-col min-h-0">
-                <h2 class="text-2xl font-bold mb-4 text-slate-700 flex-shrink-0">Destinos da Viagem</h2>
-                <ul id="itinerary-list" class="space-y-1 overflow-y-auto flex-1"></ul>
-                <div class="space-y-4 mt-6 pt-4 border-t border-slate-200 flex-shrink-0">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-600 mb-2">Modo de Navegação</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="mode-fast" class="control-btn active flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação rápida"><i data-lucide="rabbit"></i> Rápido</button>
-                            <button id="mode-fly" class="control-btn flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação com voo"><i data-lucide="feather"></i> Voo</button>
+    <main class="container mx-auto p-4 lg:p-8 max-w-7xl">
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <!-- Coluna da Esquerda: Roteiro e Controles -->
+            <div class="lg:w-1/3 xl:w-96">
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-100 flex flex-col h-full">
+                     <h2 id="panel-title" class="text-2xl font-bold mb-4 text-slate-700">Destinos da Viagem</h2>
+                    <ul id="itinerary-list" class="space-y-1 overflow-y-auto" style="max-height: 500px;"></ul>
+                     <div class="space-y-4 mt-6 pt-4 border-t border-slate-200">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-2">Modo de Navegação</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="mode-fast" class="control-btn active flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação rápida"><i data-lucide="rabbit"></i> Rápido</button>
+                                <button id="mode-fly" class="control-btn flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação com voo"><i data-lucide="feather"></i> Voo</button>
+                            </div>
                         </div>
-                    </div>
-                    <div id="fly-controls" class="hidden space-y-4 transition-opacity duration-300 opacity-0">
-                        <label class="block text-sm font-medium text-slate-600">Opções de Voo</label>
-                        <div class="flex items-center gap-3">
-                            <i data-lucide="rewind" class="text-slate-500"></i>
-                            <input type="range" id="speed-slider" min="1" max="5" value="3" class="w-full" aria-label="Controle de velocidade">
-                            <i data-lucide="fast-forward" class="text-slate-500"></i>
+                        <div id="fly-controls" class="hidden space-y-4 transition-opacity duration-300 opacity-0">
+                            <label class="block text-sm font-medium text-slate-600">Opções de Voo</label>
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="rewind" class="text-slate-500"></i>
+                                <input type="range" id="speed-slider" min="1" max="5" value="3" class="w-full" aria-label="Controle de velocidade">
+                                <i data-lucide="fast-forward" class="text-slate-500"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Coluna da Direita: Mapa -->
+            <div class="flex-1 bg-white p-2 rounded-xl shadow-lg border border-slate-100">
+                <div id="map"></div>
+            </div>
         </div>
-    </div>
-</div>
-    
-<div class="fixed bottom-0 left-0 right-0 p-4 z-20 pointer-events-none lg:hidden">
-    <div class="container mx-auto max-w-7xl">
-        <div class="grid grid-cols-2 gap-4 pointer-events-auto">
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-8">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-blue-100 p-3 rounded-full"><i data-lucide="map-pin" class="text-blue-600"></i></div>
                 <div><p class="text-sm text-slate-500">Paradas</p><p id="stops-value" class="text-xl font-bold text-slate-700">0</p></div>
             </div>
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-green-100 p-3 rounded-full"><i data-lucide="globe" class="text-green-600"></i></div>
                 <div><p class="text-sm text-slate-500">Países</p><p id="countries-value" class="text-xl font-bold text-slate-700">0</p></div>
             </div>
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4 mt-2">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-yellow-100 p-3 rounded-full"><i data-lucide="calendar" class="text-yellow-600"></i></div>
                 <div><p class="text-sm text-slate-500">Duração</p><p id="days-value" class="text-xl font-bold text-slate-700">~18 Dias</p></div>
             </div>
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4 mt-2">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-red-100 p-3 rounded-full"><i data-lucide="plane" class="text-red-600"></i></div>
                 <div><p class="text-sm text-slate-500">Distância</p><p id="km-value" class="text-xl font-bold text-slate-700">~0 km</p></div>
             </div>
         </div>
-    </div>
-</div>
+    </main>
 
     <noscript>
         <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 1000; display: flex; justify-content: center; align-items: center;">Ative o JavaScript para ver o mapa.</div>
@@ -214,8 +169,6 @@
             const modeFastBtn = document.getElementById('mode-fast');
             const modeFlyBtn = document.getElementById('mode-fly');
             const flyControls = document.getElementById('fly-controls');
-            const itineraryPanel = document.getElementById('itinerary-panel');
-            const panelHandle = document.getElementById('panel-handle');
             
             let map;
             let mapMarkers = [];
@@ -288,6 +241,8 @@
                 const li = document.createElement('li');
                 li.className = 'itinerary-item cursor-pointer rounded-lg';
                 li.dataset.index = index;
+                li.setAttribute('role', 'button');
+                li.setAttribute('tabindex', '0');
                 const prevDistanceInfo = document.createElement('div');
                 prevDistanceInfo.className = 'prev-distance-info pl-11 pb-1 text-xs text-slate-500 hidden';
                 li.appendChild(prevDistanceInfo);
@@ -375,17 +330,34 @@
                  }
             }
 
-            allItineraryItems.forEach((item, index) => item.addEventListener('click', () => selectItineraryItem(index)));
+            allItineraryItems.forEach((item, index) => {
+                item.addEventListener('click', () => selectItineraryItem(index));
+                item.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectItineraryItem(index);
+                    }
+                });
+            });
+
             speedSlider.addEventListener('input', (e) => { animationDuration = 6 - e.target.value; });
             modeFastBtn.addEventListener('click', () => setViewMode(false));
             modeFlyBtn.addEventListener('click', () => setViewMode(true));
-            panelHandle.addEventListener('click', () => itineraryPanel.classList.toggle('open'));
             
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowRight') { selectItineraryItem(currentActiveIndex + 1); } 
                 else if (e.key === 'ArrowLeft') { selectItineraryItem(currentActiveIndex - 1); }
             });
 
+            let touchstartX = 0; let touchendX = 0;
+            const appContainer = document.getElementById('map');
+            appContainer.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; }, { passive: true });
+            appContainer.addEventListener('touchend', e => {
+                touchendX = e.changedTouches[0].screenX;
+                if (touchendX < touchstartX - 50) { selectItineraryItem(currentActiveIndex + 1); }
+                if (touchendX > touchstartX + 50) { selectItineraryItem(currentActiveIndex - 1); }
+            });
+            
             initializeMap();
             lucide.createIcons();
         });
