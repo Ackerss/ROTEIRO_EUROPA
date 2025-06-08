@@ -30,34 +30,14 @@
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc; /* bg-slate-50 */
         }
-        #main-content {
-            display: grid;
-            grid-template-areas: "header" "content";
-            grid-template-rows: auto 1fr;
-            height: 100vh;
-            overflow: hidden;
+        #map {
+            height: 500px; /* Altura fixa para consistência */
+            width: 100%;
+            border-radius: 0.75rem; /* rounded-xl */
+            z-index: 1;
+            background-color: #e2e8f0;
         }
-        header { grid-area: header; }
-        #app-container { grid-area: content; touch-action: pan-y; }
-
-        #map-container { position: relative; width: 100%; height: 100%; }
-        #map { height: 100%; width: 100%; border-radius: 0.75rem; z-index: 1; background-color: #e2e8f0; }
         
-        /* Loading Spinner */
-        #map-spinner {
-            display: none; /* Hidden by default */
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 50px; height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #6366f1;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            z-index: 2;
-        }
-        @keyframes spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
-
         /* Marcadores do Mapa */
         .marker-icon { border-radius: 50%; width: 16px !important; height: 16px !important; border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.2s ease-in-out; }
         .marker-icon.active { transform: scale(1.5); z-index: 1000 !important; }
@@ -77,15 +57,11 @@
         .itinerary-item.active .item-main-info { background-color: #f1f5f9; }
         .itinerary-item.active .item-number { background-color: #6366f1; color: #ffffff; }
 
-        /* Bottom Sheet para Mobile */
-        #itinerary-panel { transform: translateY(calc(100% - 80px)); transition: transform 0.4s ease-in-out; }
-        #itinerary-panel.open { transform: translateY(0); }
     </style>
 </head>
 <body class="text-slate-800 antialiased">
 
-<div id="main-content">
-    <header class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-4 sm:p-6 shadow-lg z-20">
+    <header class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-4 sm:p-6 shadow-lg">
         <div class="container mx-auto max-w-7xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl sm:text-4xl font-bold tracking-tight">Roteiro Europa em Família</h1>
@@ -98,63 +74,59 @@
         </div>
     </header>
 
-    <div id="app-container" class="relative overflow-hidden">
-        <div id="map-container" class="absolute inset-0">
-            <div id="map"></div>
-            <div id="map-spinner"></div>
-        </div>
-        
-        <div id="itinerary-panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" class="absolute inset-0 lg:inset-auto lg:top-8 lg:left-8 lg:bottom-8 lg:w-1/3 xl:w-96 bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl border border-slate-100 flex flex-col z-10">
-            <button id="panel-handle" aria-label="Abrir ou fechar painel de destinos" class="w-full py-4 flex justify-center items-center cursor-pointer lg:hidden">
-                <div class="w-10 h-1.5 bg-slate-300 rounded-full"></div>
-            </button>
-            <div class="p-6 pt-0 lg:pt-6 flex-1 flex flex-col min-h-0">
-                <h2 id="panel-title" class="text-2xl font-bold mb-4 text-slate-700">Destinos da Viagem</h2>
-                <ul id="itinerary-list" class="space-y-1 overflow-y-auto flex-1"></ul>
-                <div class="space-y-4 mt-6 pt-4 border-t border-slate-200">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-600 mb-2">Modo de Navegação</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="mode-fast" class="control-btn active flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação rápida"><i data-lucide="rabbit"></i> Rápido</button>
-                            <button id="mode-fly" class="control-btn flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação com voo"><i data-lucide="feather"></i> Voo</button>
+    <main class="container mx-auto p-4 lg:p-8 max-w-7xl">
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <!-- Coluna da Esquerda: Roteiro e Controles -->
+            <div class="lg:w-1/3 xl:w-96">
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-100 flex flex-col h-full">
+                     <h2 id="panel-title" class="text-2xl font-bold mb-4 text-slate-700">Destinos da Viagem</h2>
+                    <ul id="itinerary-list" class="space-y-1 overflow-y-auto"></ul>
+                     <div class="space-y-4 mt-6 pt-4 border-t border-slate-200">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-2">Modo de Navegação</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="mode-fast" class="control-btn active flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação rápida"><i data-lucide="rabbit"></i> Rápido</button>
+                                <button id="mode-fly" class="control-btn flex items-center justify-center gap-2 bg-slate-100 text-slate-600 py-2 rounded-md text-sm" aria-label="Navegação com voo"><i data-lucide="feather"></i> Voo</button>
+                            </div>
                         </div>
-                    </div>
-                    <div id="fly-controls" class="hidden space-y-4 transition-opacity duration-300 opacity-0">
-                        <label class="block text-sm font-medium text-slate-600">Opções de Voo</label>
-                        <div class="flex items-center gap-3">
-                            <i data-lucide="rewind" class="text-slate-500"></i>
-                            <input type="range" id="speed-slider" min="1" max="5" value="3" class="w-full" aria-label="Controle de velocidade">
-                            <i data-lucide="fast-forward" class="text-slate-500"></i>
+                        <div id="fly-controls" class="hidden space-y-4 transition-opacity duration-300 opacity-0">
+                            <label class="block text-sm font-medium text-slate-600">Opções de Voo</label>
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="rewind" class="text-slate-500"></i>
+                                <input type="range" id="speed-slider" min="1" max="5" value="3" class="w-full" aria-label="Controle de velocidade">
+                                <i data-lucide="fast-forward" class="text-slate-500"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Coluna da Direita: Mapa -->
+            <div class="flex-1 bg-white p-2 rounded-xl shadow-lg border border-slate-100">
+                <div id="map"></div>
+            </div>
         </div>
-    </div>
-</div>
-    
-<div class="fixed bottom-0 left-0 right-0 p-4 z-20 pointer-events-none">
-    <div class="container mx-auto max-w-7xl">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 pointer-events-auto">
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-8">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-blue-100 p-3 rounded-full"><i data-lucide="map-pin" class="text-blue-600"></i></div>
                 <div><p class="text-sm text-slate-500">Paradas</p><p id="stops-value" class="text-xl font-bold text-slate-700">0</p></div>
             </div>
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-green-100 p-3 rounded-full"><i data-lucide="globe" class="text-green-600"></i></div>
                 <div><p class="text-sm text-slate-500">Países</p><p id="countries-value" class="text-xl font-bold text-slate-700">0</p></div>
             </div>
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-yellow-100 p-3 rounded-full"><i data-lucide="calendar" class="text-yellow-600"></i></div>
                 <div><p class="text-sm text-slate-500">Duração</p><p id="days-value" class="text-xl font-bold text-slate-700">~18 Dias</p></div>
             </div>
-            <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-100 flex items-center gap-4">
                 <div class="bg-red-100 p-3 rounded-full"><i data-lucide="plane" class="text-red-600"></i></div>
                 <div><p class="text-sm text-slate-500">Distância</p><p id="km-value" class="text-xl font-bold text-slate-700">~0 km</p></div>
             </div>
         </div>
-    </div>
-</div>
+    </main>
 
     <noscript>
         <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 1000; display: flex; justify-content: center; align-items: center; text-align: center; padding: 1rem; font-size: 1.2rem; color: #333;">
@@ -201,10 +173,6 @@
             const modeFastBtn = document.getElementById('mode-fast');
             const modeFlyBtn = document.getElementById('mode-fly');
             const flyControls = document.getElementById('fly-controls');
-            const itineraryPanel = document.getElementById('itinerary-panel');
-            const panelHandle = document.getElementById('panel-handle');
-            const mapContainer = document.getElementById('map-container');
-            const mapSpinner = document.getElementById('map-spinner');
             
             let map;
             let mapMarkers = [];
@@ -216,7 +184,6 @@
 
             function initializeMap() {
                 if (map) return;
-                mapSpinner.style.display = 'none';
 
                 map = L.map('map', { zoomControl: false }).setView([46, 8], 5);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -366,16 +333,6 @@
                      setTimeout(() => flyControls.classList.add('hidden'), 300);
                  }
             }
-            
-            function togglePanel() {
-                const isOpen = itineraryPanel.classList.toggle('open');
-                itineraryPanel.setAttribute('aria-expanded', isOpen);
-                if (isOpen) {
-                    allItineraryItems[currentActiveIndex].focus();
-                } else {
-                    panelHandle.focus();
-                }
-            }
 
             allItineraryItems.forEach((item, index) => {
                 item.addEventListener('click', () => selectItineraryItem(index));
@@ -397,7 +354,6 @@
             });
             modeFastBtn.addEventListener('click', () => setViewMode(false));
             modeFlyBtn.addEventListener('click', () => setViewMode(true));
-            panelHandle.addEventListener('click', togglePanel);
             
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowRight') { selectItineraryItem(currentActiveIndex + 1); } 
@@ -405,7 +361,7 @@
             });
 
             let touchstartX = 0; let touchendX = 0;
-            const appContainer = document.getElementById('app-container');
+            const appContainer = document.getElementById('map');
             appContainer.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; }, { passive: true });
             appContainer.addEventListener('touchend', e => {
                 touchendX = e.changedTouches[0].screenX;
@@ -413,15 +369,7 @@
                 if (touchendX > touchstartX + 50) { selectItineraryItem(currentActiveIndex - 1); }
             });
             
-            const observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting) {
-                    mapSpinner.style.display = 'block';
-                    initializeMap();
-                    observer.disconnect();
-                }
-            }, { threshold: 0.1 });
-            observer.observe(mapContainer);
-            
+            initializeMap();
             lucide.createIcons();
         });
     </script>
